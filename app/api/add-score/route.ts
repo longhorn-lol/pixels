@@ -1,22 +1,28 @@
-import { supabase } from "@/utils/supabase";
+import { sql } from "@/utils/db";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { username, time } = body;
+  const body = await request.json().catch(() => null);
+  const { username, time } = body ?? {};
 
-  if (!username || !time) {
+  if (
+    typeof username !== "string" ||
+    !username.trim() ||
+    !Number.isSafeInteger(time) ||
+    time <= 0
+  ) {
     return NextResponse.json(
-      { message: "Username or time is missing." },
+      { message: "A username and a positive time in milliseconds are required." },
       { status: 400 }
     );
   }
 
-  const { error } = await supabase
-    .from(process.env.SUPABASE_TABLE_NAME!)
-    .insert([{ username, time, created_at: new Date() }]);
-
-  if (error) {
+  try {
+    await sql`
+      INSERT INTO public.scores (username, time)
+      VALUES (${username.trim()}, ${time})
+    `;
+  } catch (error) {
     console.error("[leaderboard] DB error:", error);
     return NextResponse.json(
       { message: "Internal Server Error" },
